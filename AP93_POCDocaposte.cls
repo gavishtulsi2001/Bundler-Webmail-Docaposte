@@ -1,73 +1,82 @@
 /**
  * @description       : 
- * @author            : JPA
+ * @author            : ARM
  * @group             : 
- * @last modified on  : 02-05-2025
+ * @last modified on  : 01-31-2025
  * @last modified by  : Gavish Varma Tulsi
+ * @Version           :  
+ * Modifications Log
+ * Ver   Date         Author   Modification
+ * 1.0   31-01-2024   ARM   Initial Version
 **/
-global with sharing class AP93_DMLQueueable  implements Queueable {
-    
-    private List<ServiceAppointment> lstSA;
-    private String xml;
-    private List<TransactionLog__c> lstTransLog= new list<TransactionLog__c>(); 
-    private String fileName;
+public with sharing class AP93_POCDocaposte {
+	public static Map<String,String> accessingTheWebservice(String xml) {
 
-    
-    public AP93_DMLQueueable(String xml, List<ServiceAppointment> lstSA, String fileName) {
-        this.xml = xml;
-        this.lstSA = lstSA;
-        this.fileName = fileName;
-    }
-  
-    
-    public void execute(QueueableContext context) {
+		String msg='';
+		String filename = 'ChamServiceAppointment'+Datetime.now().format('dd_MM_yyyy_HH_mm_ss_SSS')+'.xml';
+		HttpRequest tokenRequest = new HttpRequest();
+		http req = new http();
 
-        if (!this.lstSA.isEmpty()) {
-            List<Database.SaveResult> lstSaResult = Database.update(this.lstSA, false);
-            handleErrors(lstSaResult, this.lstSA, lstTransLog, 'BAT76_DocaposteBatch');
-        }
+		Utils__mdt utils = Utils__mdt.getInstance('IdPrestation');
+		String idPrestationValue = '';
 
-        if (!lstTransLog.isEmpty()) {
-            Database.insert(lstTransLog, false);
-        }
+		if (utils?.IsActive__c) {
+			idPrestationValue = utils.Value__c;
+		}
 
-        if(!String.isBlank(this.xml)){
-            generateDocument(this.xml);
-        }
-    }
+		tokenRequest.setMethod('POST');
+		tokenRequest.setEndpoint('callout:Docaposte/depot2editique/api/authenticate');
+		tokenRequest.setHeader('Content-Type', 'application/json');
+		string username = '{!$Credential.Docaposte.Username}';
+		string password = '{!$Credential.Docaposte.Password}';
+		String requestBody = '{"username": "' + username + '", "password": "' + password + '"}';
+		tokenRequest.setBody(requestBody);
 
-    public void handleErrors(List<Database.SaveResult> lstSaResult, List<ServiceAppointment> lstSA, List<TransactionLog__c> lstTransLog, String processName) {
-        for (Integer i = 0; i < lstSA.size(); i++) {
-            Database.SaveResult sr = lstSaResult[i];
-            if (!sr.isSuccess()) {
-                TransactionLog__c transLog = new TransactionLog__c(
-                    ProcessName__c = processName,
-                    RecordId__c = lstSA[i].Id,
-                    Message__c = sr.getErrors().get(0).getMessage()
-                );
-                lstTransLog.add(transLog);
-            }
-        }
-    }
+		httpResponse res = req.send(tokenRequest);
 
-    public  void generateDocument(String xml){
-        ContentVersion content = new ContentVersion();
-        content.Title = this.fileName;
-        content.PathOnClient = this.fileName;
-        content.VersionData = Blob.valueof(xml);
-        content.ContentLocation = 's';
-        insert content;
-        
+		if (res.getStatusCode() == 200) {
+			String response = res.getBody();
+			map<String, String> mapResponse = (Map<String, String>) JSON.deserialize(response, Map<String, String>.class);
 
-        content = [SELECT Id, ContentDocumentId FROM ContentVersion WHERE Id = :content.Id LIMIT 1];
-        ContentDocument conDoc = new ContentDocument(Id = content.ContentDocumentId);
+			String token = mapResponse.get('id_token');
 
-        List<ContentWorkspace> lstWs = [SELECT Id, RootContentFolderId FROM ContentWorkspace WHERE Name LIKE '%DocaposteXmlFile%' LIMIT 1];
-        ContentDocumentLink cdl = new ContentDocumentLink();
-        cdl.ContentDocumentId = content.ContentDocumentId;
-        cdl.ShareType = 'I';
-        cdl.Visibility = 'AllUsers';
-        cdl.LinkedEntityId = lstWs[0].Id;
-        insert cdl;
-    }
+			String proprietes = '{"idPrestation": "' + idPrestationValue + '","type":"xml","nom":"' + fileName + '","idTransfert":"a9293b6c-2947-3e48-8db7-384e97a30693","infosClient":[{"champ":"idPerson","valeur":"c2693b6c-2947-3e48-8db7-384e97a30724"},{"champ":"idControl","valeur":"c2693b6c-2947-3e48-8db7-384e80a11111"}]}';
+
+			string Boundary = '----------------------------1ff13444ed8140c7a32fc4e6451aa76d';
+			string contentType = 'multipart/form-data; charset="UTF-8"; boundary="' + Boundary + '"';
+
+			String headerForJSON = '--' + boundary + '\r\nContent-Disposition: form-data; name="proprietes" \r\nContent-Type: application/json \r\n\r\n' + proprietes + '\r\n\r\n';
+
+			String headerForFile = '--' + boundary + '\r\nContent-Disposition: form-data; name="fichier"; filename="' + fileName + '"\r\nContent-Type: application/octet-stream \r\n\r\n' + xml + '\r\n\r\n';
+
+			String footer = '\r\n--' + boundary + '--\r\n';
+
+			String body = headerForJSON + headerForFile + footer;
+
+			HttpRequest actualRequest = new httpRequest();
+			actualRequest.setMethod('POST');
+
+			actualRequest.setEndpoint('callout:DocaposteDepot');
+			actualRequest.setHeader('Authorization', 'Bearer ' + token);
+			actualRequest.setHeader('Content-Type', 'multipart/form-data; boundary=' + boundary);
+			actualRequest.setHeader('User-Agent', 'TheUserJPA/1.0');
+			actualRequest.setHeader('Accept', '*/*');
+			actualRequest.setHeader('Connection', 'keep-alive');
+			actualRequest.setBodyAsBlob(blob.valueOf(body));
+
+			http req1 = new http();
+			HTTPResponse res1 = req1.send(actualRequest);
+
+			Map<String, Object> mapRes = (Map<String, Object>)JSON.deserializeUntyped(res1.getBody());
+			msg=(String)MapRes.get('code')+ ':' +(String)MapRes.get('message')+':';
+		} else {
+			msg='Error:';
+		}
+		
+	
+		return new map<String,String>{
+			'filename' => filename,
+			'msg'=>msg
+		};		
+	}
 }
