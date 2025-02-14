@@ -2,17 +2,17 @@
  * @description       : 
  * @author            : JPA
  * @group             : 
- * @last modified on  : 15-11-2024
- * @last modified by  : JPA
+ * @last modified on  : 02-05-2025
+ * @last modified by  : Gavish Varma Tulsi
 **/
 global with sharing class AP93_DMLQueueable  implements Queueable {
-
+    
     private List<ServiceAppointment> lstSA;
     private String xml;
     private List<TransactionLog__c> lstTransLog= new list<TransactionLog__c>(); 
     private String fileName;
 
-
+    
     public AP93_DMLQueueable(String xml, List<ServiceAppointment> lstSA, String fileName) {
         this.xml = xml;
         this.lstSA = lstSA;
@@ -51,8 +51,6 @@ global with sharing class AP93_DMLQueueable  implements Queueable {
     }
 
     public  void generateDocument(String xml){
-        
-        // String fileName = AP_Constant.generateName('DocaposteXML','.xml');
         ContentVersion content = new ContentVersion();
         content.Title = this.fileName;
         content.PathOnClient = this.fileName;
