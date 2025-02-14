@@ -2,14 +2,14 @@
  * @description       : 
  * @author            : Gavish Varma Tulsi
  * @group             : 
- * @last modified on  : 01-30-2025
+ * @last modified on  : 02-05-2025
  * @last modified by  : Gavish Varma Tulsi
  * * @Version    
  * * Modifications Log
  *   Ver    Date         Author     Modification
  *   1.0    31-01-2024   GTL        Initial Version
  *   1.1    14-10-2024   JPA        PHE-1865
- *   1.2    23-01-2024   GTL        PHE-1751 / PHE-1754 / PHE-1942 / PHE-2064
+ *   1.2    23-01-2024   GTL        PHE-1751 / PHE-1754 / PHE-1942 / PHE-2064 / PHE-2072
 **/
 global with sharing class BAT76_DocaposteBatch implements Database.Batchable<SObject>, Database.AllowsCallouts, Database.RaisesPlatformEvents, Schedulable {
     private List<ServiceAppointment> lstValidServiceApp = new List<ServiceAppointment>();
@@ -45,7 +45,7 @@ global with sharing class BAT76_DocaposteBatch implements Database.Batchable<SOb
             }
         }
         
-        String dynamicFilter = AP_Constant.constructDynamicFilter(lstFilter);
+        String dynamicFilter = Utils.constructDynamicFilter(lstFilter);
         String complexFilter = constructComplexFilter(lstComplexFilter);
         String additionalFilter = constructAdditionalFilter(lstAdditionalFilter);
 
@@ -261,7 +261,6 @@ global with sharing class BAT76_DocaposteBatch implements Database.Batchable<SOb
                     if (message.contains('820')) {
                         updatedSa.Tech_AVP__c = System.now();
                         updatedSa.Visit_Notice_Generated_In_Mass__c = true;
-                        updatedSa.Tech_Envoi_Webmail__c = isServiceAppointmentEnvoiMail(IdbyValidServApp.get(saId), idByServApp);
                     }
 
                     lstSaToUpdate.add(updatedSa);
@@ -293,6 +292,11 @@ global with sharing class BAT76_DocaposteBatch implements Database.Batchable<SOb
 
         if(String.isBlank(sa.ServiceTerritory.Agency_Code__c)){
             mapValidationResults.put('Code de l\'agence manquant', false);
+            isValid = false;
+        }
+
+        if(sa.Residence__c == null){
+            mapValidationResults.put('L\'occupant manquant', false);
             isValid = false;
         }
        
@@ -523,8 +527,8 @@ global with sharing class BAT76_DocaposteBatch implements Database.Batchable<SOb
         List<String> notTerritoryClauses = new List<String>();
 
         for(String territoryValue: territoryValues.split(',')){
-            String notTerritoryClause = AP_Constant.constructLikeClause(territoryField, territoryValue, true);
-            String contractClause = AP_Constant.constructLikeClause(contractField, contractValues, false);
+            String notTerritoryClause = Utils.constructLikeClause(territoryField, territoryValue, true);
+            String contractClause = Utils.constructLikeClause(contractField, contractValues, false);
             String modifiednotTerritoryClause = notTerritoryClause.substring(0, notTerritoryClause.length() - 3);
             String complexFilter = modifiednotTerritoryClause + contractClause + '))';
             notTerritoryClauses.add(complexFilter);
@@ -546,7 +550,7 @@ global with sharing class BAT76_DocaposteBatch implements Database.Batchable<SOb
         List<String> combineWrkTypeBundleClause = new List<String>();
 
         if (fieldValuesMap.containsKey('WorkType.Name')) {
-            String clause = AP_Constant.constructLikeClause('WorkType.Name', fieldValuesMap.get('WorkType.Name'), false);
+            String clause = Utils.constructLikeClause('WorkType.Name', fieldValuesMap.get('WorkType.Name'), false);
             workTypeClause.add(clause.replace('AND ', '').trim());
         }
     
@@ -558,9 +562,9 @@ global with sharing class BAT76_DocaposteBatch implements Database.Batchable<SOb
             String bundlePolicyValues = fieldValuesMap.get(bundlePolicyField);
             String subjectValues = fieldValuesMap.get(subjectField);
 
-            String isBundleClause = AP_Constant.constructEqualClause(isBundleField, isBundleValues, false).replace('AND ', '').trim();
-            String bundleNameClause = AP_Constant.constructEqualClause('BundlePolicy.Name', bundlePolicyValues, true).replace('AND ', '').trim();
-            String subjectClause = AP_Constant.constructLikeClause(subjectField, subjectValues, false).replace('AND ', '').trim();
+            String isBundleClause = Utils.constructEqualClause(isBundleField, isBundleValues, false).replace('AND ', '').trim();
+            String bundleNameClause = Utils.constructEqualClause('BundlePolicy.Name', bundlePolicyValues, true).replace('AND ', '').trim();
+            String subjectClause = Utils.constructLikeClause(subjectField, subjectValues, false).replace('AND ', '').trim();
             bundleClause = '(' + isBundleClause + ' AND ' + bundleNameClause   + ' AND ' + subjectClause + ')';
         }
 
@@ -573,52 +577,6 @@ global with sharing class BAT76_DocaposteBatch implements Database.Batchable<SOb
         }
     
         return combineWrkTypeBundleClause.isEmpty() ? '' : 'AND (' + String.join(combineWrkTypeBundleClause, ' OR ') + ')';
-    }
-    
-
-    //Check Envoi Mail or Envoi Edit(Tech_Envoi_Webmail__c)
-    private Boolean isServiceAppointmentEnvoiMail(ServiceAppointment sa, Map<Id, List<ServiceAppointment>> idByServApp) {
-        Set<Id> relatedBundleId = new Set<Id>();
-        if(relatedBundleId.contains(sa.Id)){
-            List<ServiceAppointment> relatedSA = idByServApp.get(sa.Id);
-            
-            if(!relatedSA.isEmpty()){
-                ServiceAppointment firstSA = relatedSA[0];
-                if (firstSA?.Service_Contract__r != null && firstSA?.Service_Contract__r?.RecordType?.DeveloperName == AP_Constant.ContratsCollectifPublic) {
-                    return false;
-                } else {
-                    if (
-                        (String.isNotBlank(firstSA.Residence__r?.Inhabitant__r?.PersonEmail) && firstSA.Residence__r.Visit_Notice_Recipient__c == 'Inhabitant') ||
-                        (String.isNotBlank(firstSA.Residence__r?.Owner__r?.PersonEmail) && firstSA.Residence__r.Visit_Notice_Recipient__c == 'Owner') ||
-                        (String.isNotBlank(firstSA.Residence__r?.Legal_Guardian__r?.PersonEmail) && firstSA.Residence__r.Visit_Notice_Recipient__c == 'Legal Guardian') ||
-                        (String.isNotBlank(firstSA.Residence__r?.Account__r?.PersonEmail) && firstSA.Residence__r.Visit_Notice_Recipient__c == 'Administrator')
-                    ) {
-                        return true;
-                    } else {
-                        return false;
-                    }
-                }
-                
-            }else{
-                return false;
-            }
-        }else{
-            
-            if (sa?.Service_Contract__r != null && sa?.Service_Contract__r?.RecordType?.DeveloperName == AP_Constant.ContratsCollectifPublic) {
-                return false;
-            } else {
-                if (
-                    (String.isNotBlank(sa.Residence__r?.Inhabitant__r?.PersonEmail) && sa.Residence__r.Visit_Notice_Recipient__c == 'Inhabitant') ||
-                    (String.isNotBlank(sa.Residence__r?.Owner__r?.PersonEmail) && sa.Residence__r.Visit_Notice_Recipient__c == 'Owner') ||
-                    (String.isNotBlank(sa.Residence__r?.Legal_Guardian__r?.PersonEmail) && sa.Residence__r.Visit_Notice_Recipient__c == 'Legal Guardian') ||
-                    (String.isNotBlank(sa.Residence__r?.Account__r?.PersonEmail) && sa.Residence__r.Visit_Notice_Recipient__c == 'Administrator')
-                ) {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-        }
     }
     
     private Boolean containsIgnoreCase(String target, List<String> values) {
