@@ -2,7 +2,7 @@
  * @description       : 
  * @author            : Gavish Varma Tulsi
  * @group             : 
- * @last modified on  : 06-18-2024
+ * @last modified on  : 02-05-2025
  * @last modified by  : Gavish Varma Tulsi
 **/
 @isTest
@@ -326,7 +326,7 @@ public with sharing class BAT76_DocaposteBatch_TEST {
             
             insert lstAccr;
             
-            ContentWorkspace testWorkspace = new ContentWorkspace(Name='DocaposteXmlFile1', DeveloperName='DocaposteXmlFile1');
+            ContentWorkspace testWorkspace = new ContentWorkspace(Name='DocaposteXmlFile12', DeveloperName='DocaposteXmlFile12');
             insert testWorkspace;
         }
 
@@ -654,5 +654,59 @@ public with sharing class BAT76_DocaposteBatch_TEST {
                 Database.executeBatch(batch);
             Test.stopTest();
         }
+    }
+    
+    @isTest
+    public static void testBatch14(){
+        // System.runAs(mainUser){
+        //     Test.setMock(HttpCalloutMock.class, new MockHttpResponseGenerator());
+
+        //     Test.startTest();
+        //         // lstSAs[0].Tech_AVP__c = null;
+        //         // lstSAs[0].Visit_Notice_Generated_In_Mass__c = false;
+        //         // lstSAs[1].Tech_AVP__c = null;
+        //         // lstSAs[1].Visit_Notice_Generated_In_Mass__c = false;
+        //         // update lstSAs; 
+
+        //         // logement1.Visit_Notice_Recipient__c='Inhabitant';
+        //         // logement1.Street__c = 'xxx';
+        //         // logement1.Adress_Complement__c = 'xxx';
+        //         // update logement1;
+        //         // BAT76_DocaposteBatch batch = new BAT76_DocaposteBatch();
+        //         // Database.executeBatch(batch);
+        //         // List<ServiceAppointment> lstSA = new List<ServiceAppointment>();
+        //         // for(ServiceAppointment ls : [SELECT Id, Tech_Doca_Webservice__c, Tech_AVP__c FROM ServiceAppointment WHERE Tech_Doca_Webservice__c != null]){
+        //         //     lstSA.add(ls);
+        //         // }
+        //         // System.debug('GTL 1:' +lstSA);
+        //         // List<ContentDocumentLink> lstConDocLk = new List<ContentDocumentLink>();
+        //         // for(ContentDocumentLink lk : [SELECT Id, ContentDocumentId, LinkedEntityId FROM ContentDocumentLink WHERE LinkedEntityId IN (SELECT Id FROM ContentWorkspace WHERE Name LIKE '%DocaposteXmlFile%')]){
+        //         //     lstConDocLk.add(lk);
+        //         // }
+        //         // System.debug('GTL 2:' +lstConDocLk);
+        //         String xml = 'xxxx';
+        //         ContentVersion content = new ContentVersion();
+        //         content.Title = 'ChamServiceAppointmentxxx';
+        //         content.PathOnClient = 'ChamServiceAppointmentxxx';
+        //         content.VersionData = Blob.valueof(xml);
+        //         content.ContentLocation = 's';
+        //         insert content;
+                
+
+        //         content = [SELECT Id, ContentDocumentId FROM ContentVersion WHERE Id = :content.Id LIMIT 1];
+        //         ContentDocument conDoc = new ContentDocument(Id = content.ContentDocumentId);
+
+        //         List<ContentWorkspace> lstWs = [SELECT Id, RootContentFolderId FROM ContentWorkspace WHERE Name LIKE '%DocaposteXmlFile%' LIMIT 1];
+        //         ContentDocumentLink cdl = new ContentDocumentLink();
+        //         cdl.ContentDocumentId = content.ContentDocumentId;
+        //         cdl.ShareType = 'I';
+        //         cdl.Visibility = 'AllUsers';
+        //         cdl.LinkedEntityId = lstWs[0].Id;
+        //         insert cdl;
+
+        //         BAT77_DeleteDocaposteXMLFiles batch2 = new BAT77_DeleteDocaposteXMLFiles();
+        //         Database.executeBatch(batch2);
+        //     Test.stopTest();
+        // }
     }
 }
